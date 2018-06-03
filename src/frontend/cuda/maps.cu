@@ -119,6 +119,20 @@ computeNmapKernel (int rows, int cols, const PtrStep<float> vmap, PtrStep<float>
     nmap.ptr (v)[u] = numeric_limits<float>::quiet_NaN ();
 }
 
+__global__ void
+computeNSMapKernel (int rows, int cols, const PtrStep<float> vmap, const PtrStep<float> nmap, PtrStep<float> nsmap)
+{
+  int u = threadIdx.x + blockIdx.x * blockDim.x;
+  int v = threadIdx.y + blockIdx.y * blockDim.y;
+/*  if (u >= cols || v >= rows)
+    return;
+
+  if (u == cols - 1 || v == rows - 1)
+    return;
+
+*/
+}
+
 void
 createVMap (const Intr& intr, const DeviceArray2D<unsigned short>& depth, DeviceArray2D<float>& vmap)
 {
@@ -140,6 +154,26 @@ void
 createNMap (const DeviceArray2D<float>& vmap, DeviceArray2D<float>& nmap)
 {
   nmap.create (vmap.rows (), vmap.cols ());
+
+  int rows = vmap.rows () / 3;
+  int cols = vmap.cols ();
+
+  dim3 block (32, 8);
+  dim3 grid (1, 1, 1);
+  grid.x = divUp (cols, block.x);
+  grid.y = divUp (rows, block.y);
+
+  computeNmapKernel<<<grid, block>>>(rows, cols, vmap, nmap);
+  cudaSafeCall (cudaGetLastError ());
+}
+
+/**
+  * create Normal Similar Map
+  */
+void
+createNSMap (const DeviceArray2D<float>& vmap, const DeviceArray2D<float>& nmap, DeviceArray2D<float>& nsmap)
+{
+  nsmap.create (vmap.rows (), vmap.cols ());
 
   int rows = vmap.rows () / 3;
   int cols = vmap.cols ();

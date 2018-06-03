@@ -107,6 +107,12 @@ class PangoVis : public ThreadObject
         pangolin::ManagedImage<uchar3> tsdfImgColor;
         pangolin::ManagedImage<uchar3> depthImg;
 
+        /**
+         * Show the result of removing disconnecting part of Normal Similar Map 
+         */
+        pangolin::GlTexture connectDepthTex;
+        pangolin::ManagedImage<uchar3> connectDepthImg;
+
         unsigned short * depthBuffer;
 };
 

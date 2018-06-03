@@ -334,6 +334,15 @@ createVMap (const Intr& intr, const DeviceArray2D<unsigned short>& depth, Device
 void
 createNMap (const DeviceArray2D<float>& vmap, DeviceArray2D<float>& nmap);
 
+/**
+  * \brief Computes normal similar map using connectation map 
+  * \param[in] vmap vertex map
+  * \param[in] nmap normal map
+  * \param[out] nsmap normal similiar map 
+  */
+void 
+createNSMap (const DeviceArray2D<float>& vmap, const DeviceArray2D<float>& nmap, DeviceArray2D<float>& nsmap);
+
 /** \brief Performs affine tranform of vertex and normal maps
   * \param[in] vmap_src source vertex map
   * \param[in] nmap_src source vertex map

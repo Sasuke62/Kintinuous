@@ -19,7 +19,7 @@
 #include "MainController.h"
 
 #include <boost/filesystem.hpp>
-#include <boost/algorithm/algorithm.hpp>
+#include <boost/detail/algorithm.hpp>//#include <boost/algorithm/algorithm.hpp>
 #include <boost/algorithm/string.hpp>
 
 MainController * MainController::controller = 0;

@@ -202,6 +202,11 @@ class KintinuousTracker
     /** \brief Array of pyramids of vertex maps for current frame in current coordinate space. */
     std::vector<DeviceArray2D<float> > nmaps_curr_;
 
+    /** \brief Array of pyramids of normal similar maps for previous frame in global coordinate space*/
+    std::vector<DeviceArray2D<float> > nsmap_g_prev_;
+    /** \brief Array of pyramids of normal similar maps for current frame in current coordinate space.*/
+    std::vector<DeviceArray2D<float> > nsmap_curr_;
+
     DeviceArray2D<uchar4> vmap_curr_color;
 
     /** \brief Buffer for storing scaled depth image */

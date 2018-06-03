@@ -121,6 +121,10 @@ class CloudSlice
 		unsigned char * tsdfImageColor;
 		unsigned char * tsdfImage;
 		unsigned short * depthData;
+		/**
+		 * Show the result of removing disconnecting part of Normal Similar Map 
+		 */
+		unsigned short * connectDepthData;
 		PlaceRecognitionInput * placeRecognitionFrame;
 
 	private:

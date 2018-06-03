@@ -363,6 +363,12 @@ void KintinuousTracker::allocateBuffers()
     vmaps_curr_.resize (ICPOdometry::LEVELS);
     nmaps_curr_.resize (ICPOdometry::LEVELS);
 
+    /**
+     *  resize buffter for nsmap 
+     */
+    nsmap_g_prev_.resize (ICPOdometry::LEVELS);
+    nsmap_curr_.resize (ICPOdometry::LEVELS);
+
     for (int i = 0; i < ICPOdometry::LEVELS; ++i)
     {
         int pyr_rows = Resolution::get().rows() >> i;
@@ -375,6 +381,12 @@ void KintinuousTracker::allocateBuffers()
 
         vmaps_curr_[i].create (pyr_rows*3, pyr_cols);
         nmaps_curr_[i].create (pyr_rows*3, pyr_cols);
+
+        /**
+         *  create buffer for nsmap 
+         */
+        nsmap_g_prev_[i].create (pyr_rows * 3, pyr_cols);
+        nsmap_curr_[i].create (pyr_rows * 3, pyr_cols);
     }
 
     vmap_curr_color.create(Resolution::get().rows(), Resolution::get().cols());
@@ -475,10 +487,14 @@ void KintinuousTracker::processFrame(const DeviceArray2D<unsigned short>& depth_
         {
             createVMap(intr(i), depths_curr_[i], vmaps_curr_[i]);
             createNMap(vmaps_curr_[i], nmaps_curr_[i]);
+    /**
+     *     Normal Similar Filter Map; 
+     */
+            createNSMap(vmaps_curr_[i],nmaps_curr_[i],nsmap_curr_[i]);
         }
     }
 
-    if(global_time_ == 0)
+    if(global_time_ == 0) 
     {
         Eigen::Matrix<float, 3, 3, Eigen::RowMajor> init_Rcam = rmats_[rmats_.size() - 1];
         Eigen::Vector3f   init_tcam = tvecs_[tvecs_.size() - 1];

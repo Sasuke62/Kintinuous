@@ -51,12 +51,18 @@ PangoVis::PangoVis(cv::Mat * depthIntrinsics)
     depthTex.Reinitialise(Resolution::get().width(), Resolution::get().height()),
     tsdfRgbTex.Reinitialise(Resolution::get().width(), Resolution::get().height()),
     tsdfTex.Reinitialise(Resolution::get().width(), Resolution::get().height()),
+    /**
+     *  Show the result of removing disconnecting part of Normal Similar Map 
+     */
+    connectDepthTex.Reinitialise(Resolution::get().width(), Resolution::get().height()),
+    connectDepthImg.Reinitialise(Resolution::get().width(), Resolution::get().height());
 
     rgbImg.Reinitialise(Resolution::get().width(), Resolution::get().height());
     tsdfImg.Reinitialise(Resolution::get().width(), Resolution::get().height());
     tsdfImgColor.Reinitialise(Resolution::get().width(), Resolution::get().height());
     depthImg.Reinitialise(Resolution::get().width(), Resolution::get().height());
 
+    
     glEnable(GL_DEPTH_TEST);
 
     s_cam = pangolin::OpenGlRenderState(pangolin::ProjectionMatrix(640, 480, 420, 420, 320, 240, 0.1, 1000),
@@ -67,8 +73,9 @@ PangoVis::PangoVis(cv::Mat * depthIntrinsics)
 
     pangolin::Display("Img").SetAspect(640.0f / 480.0f);
     pangolin::Display("Depth").SetAspect(640.0f / 480.0f);
+    pangolin::Display("ConnectDepth").SetAspect(640.0f / 480.0f);
     pangolin::Display("ModelImg").SetAspect(640.0f / 480.0f);
-    pangolin::Display("Model").SetAspect(640.0f / 480.0f);
+ //   pangolin::Display("Model").SetAspect(640.0f / 480.0f);
 
     pangolin::CreatePanel("ui").SetBounds(0.0, 1.0, 0.0, pangolin::Attach::Pix(180));
 
@@ -76,8 +83,9 @@ PangoVis::PangoVis(cv::Mat * depthIntrinsics)
                               .SetLayout(pangolin::LayoutEqualHorizontal)
                               .AddDisplay(pangolin::Display("Img"))
                               .AddDisplay(pangolin::Display("Depth"))
-                              .AddDisplay(pangolin::Display("ModelImg"))
-                              .AddDisplay(pangolin::Display("Model"));
+                              .AddDisplay(pangolin::Display("ConnectDepth"))
+                              .AddDisplay(pangolin::Display("ModelImg"));
+//                              .AddDisplay(pangolin::Display("Model"));
 
     K = Eigen::Matrix3f::Identity();
     K(0, 0) = depthIntrinsics->at<double>(0,0);
@@ -443,11 +451,14 @@ void PangoVis::render()
     pangolin::Display("Depth").Activate();
     depthTex.RenderToViewport(true);
 
+    pangolin::Display("ConnectDepth").Activate();
+    connectDepthTex.RenderToViewport(true);
+
     pangolin::Display("ModelImg").Activate();
     tsdfRgbTex.RenderToViewport(true);
 
-    pangolin::Display("Model").Activate();
-    tsdfTex.RenderToViewport(true);
+//    pangolin::Display("Model").Activate();
+//    tsdfTex.RenderToViewport(true);
 
     glEnable(GL_DEPTH_TEST);
 }
@@ -482,10 +493,15 @@ void PangoVis::processImages()
             depthImg[i].x = ((float)depthBuffer[i] / max) * 255.0f;
             depthImg[i].y = ((float)depthBuffer[i] / max) * 255.0f;
             depthImg[i].z = ((float)depthBuffer[i] / max) * 255.0f;
+            
+            connectDepthImg[i].x = ((float)depthBuffer[i] / max) * 255.0f;
+            connectDepthImg[i].y = ((float)depthBuffer[i] / max) * 255.0f;
+            connectDepthImg[i].z = ((float)depthBuffer[i] / max) * 255.0f;    
         }
 
         rgbTex.Upload(rgbImg.ptr, GL_RGB, GL_UNSIGNED_BYTE);
         depthTex.Upload(depthImg.ptr, GL_RGB, GL_UNSIGNED_BYTE);
+        connectDepthTex.Upload(connectDepthImg.ptr, GL_RGB, GL_UNSIGNED_BYTE);
         tsdfRgbTex.Upload(tsdfImgColor.ptr, GL_RGB, GL_UNSIGNED_BYTE);
         tsdfTex.Upload(tsdfImg.ptr, GL_BGR, GL_UNSIGNED_BYTE);
 
