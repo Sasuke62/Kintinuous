@@ -112,7 +112,8 @@ class PangoVis : public ThreadObject
          */
         pangolin::GlTexture connectDepthTex;
         pangolin::ManagedImage<uchar3> connectDepthImg;
-
+        unsigned short * connectDepthBuffer;
+        
         unsigned short * depthBuffer;
 };
 

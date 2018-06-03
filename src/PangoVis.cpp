@@ -96,7 +96,7 @@ PangoVis::PangoVis(cv::Mat * depthIntrinsics)
     Kinv = K.inverse();
 
     depthBuffer = new unsigned short[Resolution::get().numPixels()];
-
+    connectDepthBuffer = new unsigned short[Resolution::get().numPixels()];
     reset();
 }
 
@@ -105,6 +105,7 @@ PangoVis::~PangoVis()
     reset();
 
     delete [] depthBuffer;
+    delete [] connectDepthBuffer;
 }
 
 void PangoVis::removeAllClouds()
@@ -475,7 +476,8 @@ void PangoVis::processImages()
         memcpy(tsdfImgColor.ptr, threadPack.tracker->getLiveImage()->tsdfImageColor, Resolution::get().numPixels() * 3);
         memcpy(rgbImg.ptr, threadPack.tracker->getLiveImage()->rgbImage, Resolution::get().numPixels() * 3);
         memcpy(&depthBuffer[0], threadPack.tracker->getLiveImage()->depthData, Resolution::get().numPixels() * 2);
-
+//      memcpy(&connectDepthBuffer[0], threadPack.tracker->getLiveImage()->connectDepthData, Resolution::get().numPixels() * 2);
+        memcpy(&connectDepthBuffer[0], threadPack.tracker->getLiveImage()->depthData, Resolution::get().numPixels() * 2);
         imageLock.unlock();
 
         float max = 0;
@@ -492,11 +494,26 @@ void PangoVis::processImages()
         {
             depthImg[i].x = ((float)depthBuffer[i] / max) * 255.0f;
             depthImg[i].y = ((float)depthBuffer[i] / max) * 255.0f;
-            depthImg[i].z = ((float)depthBuffer[i] / max) * 255.0f;
-            
-            connectDepthImg[i].x = ((float)depthBuffer[i] / max) * 255.0f;
-            connectDepthImg[i].y = ((float)depthBuffer[i] / max) * 255.0f;
-            connectDepthImg[i].z = ((float)depthBuffer[i] / max) * 255.0f;    
+            depthImg[i].z = ((float)depthBuffer[i] / max) * 255.0f; 
+        }
+    /**
+     * connect depth buffer into rendering connectDepthImg
+     */
+        float connectMax = 0;
+
+        for(int i = 0; i < Resolution::get().numPixels(); i++)
+        {
+            if(connectDepthBuffer[i] > max)
+            {
+                max = connectDepthBuffer[i];
+            }
+        }
+
+        for(size_t i = 0; i < connectDepthImg.Area(); i++)
+        {
+            connectDepthImg[i].x = ((float)connectDepthBuffer[i] / max) * 255.0f;
+            connectDepthImg[i].y = ((float)connectDepthBuffer[i] / max) * 255.0f;
+            connectDepthImg[i].z = ((float)connectDepthBuffer[i] / max) * 255.0f; 
         }
 
         rgbTex.Upload(rgbImg.ptr, GL_RGB, GL_UNSIGNED_BYTE);

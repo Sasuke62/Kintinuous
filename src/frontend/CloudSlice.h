@@ -125,6 +125,7 @@ class CloudSlice
 		 * Show the result of removing disconnecting part of Normal Similar Map 
 		 */
 		unsigned short * connectDepthData;
+
 		PlaceRecognitionInput * placeRecognitionFrame;
 
 	private:
