@@ -79,6 +79,7 @@ class CloudSlice
             if(depthData != 0)
             {
                 this->depthData = new unsigned short[Resolution::get().numPixels()];
+				this->connectDepthData = new unsigned short[Resolution::get().numPixels()];
                 memcpy(this->depthData, depthData, sizeof(unsigned short) * Resolution::get().numPixels());
             }
             else
@@ -106,6 +107,9 @@ class CloudSlice
 
 			if(depthData)
 				delete [] depthData;
+
+			if(connectDepthData)
+				delete [] connectDepthData;
 		}
 
 		pcl::PointCloud<pcl::PointXYZRGB> * cloud;

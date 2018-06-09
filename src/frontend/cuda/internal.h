@@ -334,14 +334,17 @@ createVMap (const Intr& intr, const DeviceArray2D<unsigned short>& depth, Device
 void
 createNMap (const DeviceArray2D<float>& vmap, DeviceArray2D<float>& nmap);
 
-/**
-  * \brief Computes normal similar map using connectation map 
+/**  
+  * \Add by LiuRui
+  * 
+  * \brief Computes normal similarity map using connectation map 
   * \param[in] vmap vertex map
   * \param[in] nmap normal map
+  * \param[in] thresholdNormalCos 
   * \param[out] nsmap normal similiar map 
   */
 void 
-createNSMap (const DeviceArray2D<float>& vmap, const DeviceArray2D<float>& nmap, DeviceArray2D<float>& nsmap);
+createNSMap (const DeviceArray2D<float>& vmap, const DeviceArray2D<float>& nmap, float thresholdNormalCos, DeviceArray2D<float>& nsmap);
 
 /** \brief Performs affine tranform of vertex and normal maps
   * \param[in] vmap_src source vertex map
@@ -502,6 +505,31 @@ void icpStep(const Mat33& Rcurr,
              const Intr& intr,
              const DeviceArray2D<float>& vmap_g_prev,
              const DeviceArray2D<float>& nmap_g_prev,
+             float distThres,
+             float angleThres,
+             DeviceArray<JtJJtrSE3> & sum,
+             DeviceArray<JtJJtrSE3> & out,
+             float * matrixA_host,
+             float * vectorB_host,
+             float * residual_host,
+             int threads,
+             int blocks);
+
+/**
+ *  \ICP Step using connect depth data
+ */
+
+void icpStep_Connect(const Mat33& Rcurr,
+             const float3& tcurr,
+             const DeviceArray2D<float>& vmap_curr,
+             const DeviceArray2D<float>& nmap_curr,
+             const DeviceArray2D<float>& nsmap_curr,
+             const Mat33& Rprev_inv,
+             const float3& tprev,
+             const Intr& intr,
+             const DeviceArray2D<float>& vmap_g_prev,
+             const DeviceArray2D<float>& nmap_g_prev,
+             const DeviceArray2D<float>& nsmap_g_prev, 
              float distThres,
              float angleThres,
              DeviceArray<JtJJtrSE3> & sum,

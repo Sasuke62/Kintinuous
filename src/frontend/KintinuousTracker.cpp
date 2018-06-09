@@ -66,6 +66,7 @@
 
 #include "../utils/ConfigArgs.h"
 #include "KintinuousTracker.h"
+#include "../PangoVis.h"
 #include "Volume.h"
 
 KintinuousTracker::KintinuousTracker(cv::Mat * depthIntrinsics)
@@ -161,6 +162,24 @@ KintinuousTracker::KintinuousTracker(cv::Mat * depthIntrinsics)
             std::cout << "Using RGB-D odometry" << std::endl;
         }
     }
+    else if(ConfigArgs::get().useICP_Connect)
+    {
+        icp_connect = new ICP_ConnectOdometry(tvecs_,
+                              rmats_,
+                              vmaps_g_prev_,
+                              nmaps_g_prev_,
+                              vmaps_curr_,
+                              nmaps_curr_,
+                              nsmaps_g_prev_,
+                              nsmaps_curr_,
+                              intr);
+
+        odometryProvider = dynamic_cast<OdometryProvider *>(icp_connect);
+
+        lastOdometry = CloudSlice::ICP;
+
+        std::cout << "-----test-----" << "Using ICP_Connect odometry" << std::endl;
+    }
     else
     {
         icp = new ICPOdometry(tvecs_,
@@ -185,6 +204,9 @@ KintinuousTracker::~KintinuousTracker()
 {
     if(icp)
         delete icp;
+
+    if(icp_connect)
+        delete icp_connect;
 
     if(rgbd)
         delete rgbd;
@@ -366,8 +388,8 @@ void KintinuousTracker::allocateBuffers()
     /**
      *  resize buffter for nsmap 
      */
-    nsmap_g_prev_.resize (ICPOdometry::LEVELS);
-    nsmap_curr_.resize (ICPOdometry::LEVELS);
+    nsmaps_g_prev_.resize (ICPOdometry::LEVELS);
+    nsmaps_curr_.resize (ICPOdometry::LEVELS);
 
     for (int i = 0; i < ICPOdometry::LEVELS; ++i)
     {
@@ -385,8 +407,8 @@ void KintinuousTracker::allocateBuffers()
         /**
          *  create buffer for nsmap 
          */
-        nsmap_g_prev_[i].create (pyr_rows * 3, pyr_cols);
-        nsmap_curr_[i].create (pyr_rows * 3, pyr_cols);
+        nsmaps_g_prev_[i].create (pyr_rows, pyr_cols);
+        nsmaps_curr_[i].create (pyr_rows, pyr_cols);
     }
 
     vmap_curr_color.create(Resolution::get().rows(), Resolution::get().cols());
@@ -474,7 +496,7 @@ void KintinuousTracker::processFrame(const DeviceArray2D<unsigned short>& depth_
         return;
     }
 
-    if(icp || ConfigArgs::get().useRGBDICP || !ConfigArgs::get().disableColorAngleWeight)
+    if(icp || icp_connect || ConfigArgs::get().useRGBDICP || !ConfigArgs::get().disableColorAngleWeight)
     {
         bilateralFilter(depth_raw, depths_curr_[0]);
 
@@ -487,12 +509,15 @@ void KintinuousTracker::processFrame(const DeviceArray2D<unsigned short>& depth_
         {
             createVMap(intr(i), depths_curr_[i], vmaps_curr_[i]);
             createNMap(vmaps_curr_[i], nmaps_curr_[i]);
-    /**
-     *     Normal Similar Filter Map; 
-     */
-            createNSMap(vmaps_curr_[i],nmaps_curr_[i],nsmap_curr_[i]);
+            if(icp_connect)
+            {
+//                std::cout << "-----test-----" << "createNSMap" << std::endl;
+                createNSMap(vmaps_curr_[i], nmaps_curr_[i], PangoVis::thresholdNormalCos, nsmaps_curr_[i]);
+            }
         }
     }
+
+    
 
     if(global_time_ == 0) 
     {
@@ -534,6 +559,10 @@ void KintinuousTracker::processFrame(const DeviceArray2D<unsigned short>& depth_
         for (int i = 0; i < ICPOdometry::LEVELS; ++i)
         {
             tranformMaps(vmaps_curr_[i], nmaps_curr_[i], device_Rcam, device_tcam, vmaps_g_prev_[i], nmaps_g_prev_[i]);
+            if(icp_connect)
+            {
+                nsmaps_curr_[i].copyTo(nsmaps_g_prev_[i]);
+            }
         }
 
         ++global_time_;

@@ -66,6 +66,7 @@
 #include "Resolution.h"
 
 #include "ICPOdometry.h"
+#include "ICP_ConnectOdometry.h"
 #include "RGBDOdometry.h"
 #include "GroundTruthOdometry.h"
 #include "../utils/ThreadMutexObject.h"
@@ -202,10 +203,10 @@ class KintinuousTracker
     /** \brief Array of pyramids of vertex maps for current frame in current coordinate space. */
     std::vector<DeviceArray2D<float> > nmaps_curr_;
 
-    /** \brief Array of pyramids of normal similar maps for previous frame in global coordinate space*/
-    std::vector<DeviceArray2D<float> > nsmap_g_prev_;
-    /** \brief Array of pyramids of normal similar maps for current frame in current coordinate space.*/
-    std::vector<DeviceArray2D<float> > nsmap_curr_;
+    /** \brief Array of pyramids of normal similarity maps for previous frame in global coordinate space*/
+    std::vector<DeviceArray2D<float> > nsmaps_g_prev_;
+    /** \brief Array of pyramids of normal similarity maps for current frame in current coordinate space.*/
+    std::vector<DeviceArray2D<float> > nsmaps_curr_;
 
     DeviceArray2D<uchar4> vmap_curr_color;
 
@@ -244,6 +245,7 @@ class KintinuousTracker
     uint64_t last_utime;
 
     ICPOdometry * icp;
+    ICP_ConnectOdometry * icp_connect;
     RGBDOdometry * rgbd;
     GroundTruthOdometry * groundTruth;
     OdometryProvider * odometryProvider;

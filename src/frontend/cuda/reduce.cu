@@ -418,6 +418,258 @@ void icpStep(const Mat33& Rcurr,
     residual_host[1] = host_data[28];
 }
 
+
+struct ICPConnectReduction
+{
+    Mat33 Rcurr;
+    float3 tcurr;
+
+    PtrStep<float> vmap_curr;
+    PtrStep<float> nmap_curr;
+    PtrStep<float> nsmap_curr;
+
+    Mat33 Rprev_inv;
+    float3 tprev;
+
+    Intr intr;
+
+    PtrStep<float> vmap_g_prev;
+    PtrStep<float> nmap_g_prev;
+    PtrStep<float> nsmap_g_prev;
+
+    float distThres;
+    float angleThres;
+
+    int cols;
+    int rows;
+    int N;
+
+    JtJJtrSE3 * out;
+
+    __device__ __forceinline__ bool
+    search (int & x, int & y, float3& n, float3& d, float3& s) const
+    {
+        float ns_curr = nsmap_curr.ptr(y)[x];
+        if(!isnan(ns_curr) && ns_curr >= 0.5)       //nsmap 上为nan或值小于0.5的不进行匹配
+        {
+            float3 vcurr;
+            vcurr.x = vmap_curr.ptr (y       )[x];
+            vcurr.y = vmap_curr.ptr (y + rows)[x];
+            vcurr.z = vmap_curr.ptr (y + 2 * rows)[x];
+
+            float3 vcurr_g = Rcurr * vcurr + tcurr;
+            float3 vcurr_cp = Rprev_inv * (vcurr_g - tprev);
+
+            int2 ukr;
+            ukr.x = __float2int_rn (vcurr_cp.x * intr.fx / vcurr_cp.z + intr.cx);
+            ukr.y = __float2int_rn (vcurr_cp.y * intr.fy / vcurr_cp.z + intr.cy);
+
+            if(ukr.x < 0 || ukr.y < 0 || ukr.x >= cols || ukr.y >= rows || vcurr_cp.z < 0)
+                return false;
+            
+            float ns_g_prev = nsmap_g_prev.ptr(ukr.y)[ukr.x];
+            if(isnan(ns_g_prev) || ns_g_prev < 0.5)
+                return false;
+
+            float3 vprev_g;
+            vprev_g.x = __ldg(&vmap_g_prev.ptr (ukr.y       )[ukr.x]);
+            vprev_g.y = __ldg(&vmap_g_prev.ptr (ukr.y + rows)[ukr.x]);
+            vprev_g.z = __ldg(&vmap_g_prev.ptr (ukr.y + 2 * rows)[ukr.x]);
+
+            float3 ncurr;
+            ncurr.x = nmap_curr.ptr (y)[x];
+            ncurr.y = nmap_curr.ptr (y + rows)[x];
+            ncurr.z = nmap_curr.ptr (y + 2 * rows)[x];
+
+            float3 ncurr_g = Rcurr * ncurr;
+
+            float3 nprev_g;
+            nprev_g.x =  __ldg(&nmap_g_prev.ptr (ukr.y)[ukr.x]);
+            nprev_g.y = __ldg(&nmap_g_prev.ptr (ukr.y + rows)[ukr.x]);
+            nprev_g.z = __ldg(&nmap_g_prev.ptr (ukr.y + 2 * rows)[ukr.x]);
+
+            float dist = norm (vprev_g - vcurr_g);
+            float sine = norm (cross (ncurr_g, nprev_g));
+
+            n = nprev_g;
+            d = vprev_g;
+            s = vcurr_g;
+
+            return (sine < angleThres && dist <= distThres && !isnan (ncurr.x) && !isnan (nprev_g.x));
+        }
+        else 
+            return false;
+    }
+
+    __device__ __forceinline__ JtJJtrSE3
+    getProducts(int & i) const
+    {
+        int y = i / cols;
+        int x = i - (y * cols);
+
+        float3 n_cp, d_cp, s_cp;
+
+        bool found_coresp = search (x, y, n_cp, d_cp, s_cp);
+
+        float row[7] = {0, 0, 0, 0, 0, 0, 0};
+
+        if(found_coresp)
+        {
+            s_cp = Rprev_inv * (s_cp - tprev);
+            d_cp = Rprev_inv * (d_cp - tprev);
+            n_cp = Rprev_inv * (n_cp);
+
+            *(float3*)&row[0] = n_cp;
+            *(float3*)&row[3] = cross (s_cp, n_cp);
+            row[6] = dot (n_cp, s_cp - d_cp);
+        }
+
+        JtJJtrSE3 values = {row[0] * row[0],
+                            row[0] * row[1],
+                            row[0] * row[2],
+                            row[0] * row[3],
+                            row[0] * row[4],
+                            row[0] * row[5],
+                            row[0] * row[6],
+
+                            row[1] * row[1],
+                            row[1] * row[2],
+                            row[1] * row[3],
+                            row[1] * row[4],
+                            row[1] * row[5],
+                            row[1] * row[6],
+
+                            row[2] * row[2],
+                            row[2] * row[3],
+                            row[2] * row[4],
+                            row[2] * row[5],
+                            row[2] * row[6],
+
+                            row[3] * row[3],
+                            row[3] * row[4],
+                            row[3] * row[5],
+                            row[3] * row[6],
+
+                            row[4] * row[4],
+                            row[4] * row[5],
+                            row[4] * row[6],
+
+                            row[5] * row[5],
+                            row[5] * row[6],
+
+                            row[6] * row[6],
+                            found_coresp};
+
+        return values;
+    }
+
+    __device__ __forceinline__ void
+    operator () () const
+    {
+        JtJJtrSE3 sum = {0, 0, 0, 0, 0, 0, 0, 0,
+                         0, 0, 0, 0, 0, 0, 0, 0,
+                         0, 0, 0, 0, 0, 0, 0, 0,
+                         0, 0, 0, 0, 0};
+
+        for(int i = blockIdx.x * blockDim.x + threadIdx.x; i < N; i += blockDim.x * gridDim.x)
+        {
+            JtJJtrSE3 val = getProducts(i);
+
+            sum.add(val);
+        }
+
+        sum = blockReduceSum(sum);
+
+        if(threadIdx.x == 0)
+        {
+            out[blockIdx.x] = sum;
+        }
+    }
+};
+
+__global__ void icpConnectKernel(const ICPConnectReduction icp_connect)
+{
+    icp_connect();
+}
+
+void icpStep_Connect(const Mat33& Rcurr,
+    const float3& tcurr,
+    const DeviceArray2D<float>& vmap_curr,
+    const DeviceArray2D<float>& nmap_curr,
+    const DeviceArray2D<float>& nsmap_curr,
+    const Mat33& Rprev_inv,
+    const float3& tprev,
+    const Intr& intr,
+    const DeviceArray2D<float>& vmap_g_prev,
+    const DeviceArray2D<float>& nmap_g_prev,
+    const DeviceArray2D<float>& nsmap_g_prev,
+    float distThres,
+    float angleThres,
+    DeviceArray<JtJJtrSE3> & sum,
+    DeviceArray<JtJJtrSE3> & out,
+    float * matrixA_host,
+    float * vectorB_host,
+    float * residual_host,
+    int threads,
+    int blocks)
+{
+    int cols = vmap_curr.cols ();
+    int rows = vmap_curr.rows () / 3;
+
+    ICPConnectReduction icp_connect;
+
+    icp_connect.Rcurr = Rcurr;
+    icp_connect.tcurr = tcurr;
+
+    icp_connect.vmap_curr = vmap_curr;
+    icp_connect.nmap_curr = nmap_curr;
+    icp_connect.nsmap_curr = nsmap_curr;
+
+    icp_connect.Rprev_inv = Rprev_inv;
+    icp_connect.tprev = tprev;
+
+    icp_connect.intr = intr;
+
+    icp_connect.vmap_g_prev = vmap_g_prev;
+    icp_connect.nmap_g_prev = nmap_g_prev;
+    icp_connect.nsmap_g_prev = nsmap_g_prev;
+
+    icp_connect.distThres = distThres;
+    icp_connect.angleThres = angleThres;
+
+    icp_connect.cols = cols;
+    icp_connect.rows = rows;
+
+    icp_connect.N = cols * rows;
+    icp_connect.out = sum;
+
+    icpConnectKernel<<<blocks, threads>>>(icp_connect);
+
+    reduceSum<<<1, MAX_THREADS>>>(sum, out, blocks);
+
+    cudaSafeCall(cudaGetLastError());
+    cudaSafeCall(cudaDeviceSynchronize());
+
+    float host_data[32];
+    out.download((JtJJtrSE3 *)&host_data[0]);
+
+    int shift = 0;
+    for (int i = 0; i < 6; ++i)
+    {
+        for (int j = i; j < 7; ++j)
+        {
+            float value = host_data[shift++];
+            if (j == 6)
+                vectorB_host[i] = value;
+            else
+                matrixA_host[j * 6 + i] = matrixA_host[i * 6 + j] = value;
+        }
+    }
+
+    residual_host[0] = host_data[27];
+    residual_host[1] = host_data[28];
+}
+
 #define FLT_EPSILON ((float)1.19209290E-07F)
 
 struct RGBReduction

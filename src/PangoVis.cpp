@@ -18,7 +18,8 @@
 
 //This includes "PangoVis.h" already
 #include "MainController.h"
-
+pangolin::Var<float> PangoVis::thresholdNormalCos = pangolin::Var<float>("ui.thr_Normal_Cos",0.95,0,1); 
+pangolin::Var<float> PangoVis::icpReject = pangolin::Var<float>("ui.icp_Reject",0.5,0,1); 
 PangoVis::PangoVis(cv::Mat * depthIntrinsics)
  : ThreadObject("VisualisationThread"),
    liveTSDF(0),

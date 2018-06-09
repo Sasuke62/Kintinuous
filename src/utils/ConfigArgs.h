@@ -62,6 +62,7 @@ class ConfigArgs
                                         "    -nos : Remove overlap when saving map\n"
                                         "    -r : Use RGB tracking only\n"
                                         "    -ri : Use combined ICP+RGB tracking\n"
+                                        "    -ic : Use ICP_Connect tracking\n"
                                         "    -d : Enable dynamic cube positioning\n"
                                         "    -dc : Disable color weighting by angle\n"
                                         "    -fl : Subsample pose graph for faster loop closure\n"
@@ -97,6 +98,7 @@ class ConfigArgs
         bool saveOverlap;
         bool useRGBD;
         bool useRGBDICP;
+        bool useICP_Connect;
         bool dynamicCube;
         bool onlineDeformation;
         bool disableColorAngleWeight;
@@ -153,11 +155,13 @@ class ConfigArgs
             saveOverlap = !pcl::console::find_switch(argc, argv, "-nos");
             useRGBD = pcl::console::find_switch(argc, argv, "-r");
             useRGBDICP = pcl::console::find_switch(argc, argv, "-ri");
+            useICP_Connect = pcl::console::find_switch(argc, argv, "-ic");
             dynamicCube = pcl::console::find_switch(argc, argv, "-d");
             disableColorAngleWeight = pcl::console::find_switch(argc, argv, "-dc");
             fastLoops = pcl::console::find_switch(argc, argv, "-fl") && onlineDeformation;
             incrementalMesh = enableMeshGenerator && onlineDeformation;
             fastOdometry = pcl::console::find_switch(argc, argv, "-fod");
+
 
             if(voxelShift < 1 || voxelShift > 16)
             {

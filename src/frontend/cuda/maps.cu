@@ -120,17 +120,100 @@ computeNmapKernel (int rows, int cols, const PtrStep<float> vmap, PtrStep<float>
 }
 
 __global__ void
-computeNSMapKernel (int rows, int cols, const PtrStep<float> vmap, const PtrStep<float> nmap, PtrStep<float> nsmap)
+computeNSMapKernel (int rows, int cols, float thresholdNormalCos, const PtrStep<float> vmap, const PtrStep<float> nmap, PtrStep<float> nsmap)
 {
   int u = threadIdx.x + blockIdx.x * blockDim.x;
   int v = threadIdx.y + blockIdx.y * blockDim.y;
-/*  if (u >= cols || v >= rows)
-    return;
 
-  if (u == cols - 1 || v == rows - 1)
-    return;
+  if(u >= cols || v >= rows)
+  {
+    return ;
+  }
+  if(u == 0 || v == 0 || u == cols -1 || v == rows -1)      // 对于边缘的深度点 保留or剔除？
+  {
+    if (isnan(nmap.ptr (v)[u]))     //若对应的nmap值为nan，则剔除这个点，
+    {
+      nsmap.ptr (v)[u] = numeric_limits<float>::quiet_NaN();
+    }
+    else
+    {
+      nsmap.ptr (v)[u] = 1.0;
+    }
+  }
+  
+  //  float2 n_1_1, n_10, n_11, n0_1, n00, n01, n1_1, n10, n11;       //保存当前点8邻域的n
+  //先使用右、下两个点试验一下    //cosTheta = x.dot(y) / (x.dot(x)*y.dot(y))
+  int similarity = 0;
+  int count = 0;
+  float3 n00, n01, n0_1, n10, n_10;
 
-*/
+  //当前点
+  n00.x = nmap.ptr (v)[u];
+  n00.y = nmap.ptr (v + rows)[u];
+  n00.z = nmap.ptr (v + 2 * rows)[u];
+
+  //4邻域
+  n10.x = nmap.ptr (v)[u + 1];
+  n_10.x = nmap.ptr (v)[u -1 ];
+  n01.x = nmap.ptr (v + 1)[u];
+  n0_1.x = nmap.ptr (v - 1)[u];
+
+  //依次计算n00 与邻域内向量的夹角
+  //若向量为nan,则不计算与该点向量的相似度
+  //若向量不为nan，则更新similarity和count
+  if(!isnan(n01.x))
+  {
+    count ++;
+    n01.y = nmap.ptr (v + 1 + rows)[u];
+    n01.z = nmap.ptr (v + 1 + 2 * rows)[u];
+
+    float cosTheta = dot(n00, n01) / (norm(n00) * norm(n01));
+    if(cosTheta >= thresholdNormalCos)
+    {
+      similarity ++;
+    }
+  }
+
+  if(!isnan(n0_1.x))
+  {
+    count ++;
+    n01.y = nmap.ptr (v - 1 + rows)[u];
+    n01.z = nmap.ptr (v - 1 + 2 * rows)[u];
+
+    float cosTheta = dot(n00, n0_1) / (norm(n00) * norm(n0_1));
+    if(cosTheta >= thresholdNormalCos)
+    {
+      similarity ++;
+    }
+  }
+
+  if(!isnan(n10.x))
+  {
+    count ++;
+    n10.y = nmap.ptr (v + rows)[u + 1];
+    n10.z = nmap.ptr (v + 2 * rows)[u + 1];
+
+    float cosTheta = dot(n00, n10) / (norm(n00) * norm(n10));
+    if(cosTheta >= thresholdNormalCos)
+    {
+      similarity ++;
+    }
+  }
+
+  if(!isnan(n_10.x))
+  {
+    count ++;
+    n10.y = nmap.ptr (v + rows)[u - 1];
+    n10.z = nmap.ptr (v + 2 * rows)[u - 1];
+
+    float cosTheta = dot(n00, n_10) / (norm(n00) * norm(n_10));
+    if(cosTheta >= thresholdNormalCos)
+    {
+      similarity ++;
+    }
+  }
+
+  nsmap.ptr(v)[u] = float(similarity) / count;
 }
 
 void
@@ -171,9 +254,9 @@ createNMap (const DeviceArray2D<float>& vmap, DeviceArray2D<float>& nmap)
   * create Normal Similar Map
   */
 void
-createNSMap (const DeviceArray2D<float>& vmap, const DeviceArray2D<float>& nmap, DeviceArray2D<float>& nsmap)
+createNSMap (const DeviceArray2D<float>& vmap, const DeviceArray2D<float>& nmap, float thresholdNormalCos, DeviceArray2D<float>& nsmap)
 {
-  nsmap.create (vmap.rows (), vmap.cols ());
+  nsmap.create (vmap.rows () / 3, vmap.cols ());
 
   int rows = vmap.rows () / 3;
   int cols = vmap.cols ();
@@ -183,7 +266,7 @@ createNSMap (const DeviceArray2D<float>& vmap, const DeviceArray2D<float>& nmap,
   grid.x = divUp (cols, block.x);
   grid.y = divUp (rows, block.y);
 
-  computeNmapKernel<<<grid, block>>>(rows, cols, vmap, nmap);
+  computeNSMapKernel<<<grid, block>>>(rows, cols, thresholdNormalCos, vmap, nmap, nsmap);
   cudaSafeCall (cudaGetLastError ());
 }
 

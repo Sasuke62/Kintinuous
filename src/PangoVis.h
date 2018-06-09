@@ -33,6 +33,10 @@ class PangoVis : public ThreadObject
 
         void reset();
 
+    public:
+        static pangolin::Var<float> thresholdNormalCos;
+        static pangolin::Var<float> icpReject;
+
     private:
         bool inline process();
 
